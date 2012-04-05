@@ -234,7 +234,7 @@ endif
 
 droid: busybox
 
-systemtarball: busybox
+systemtarball: symlinks
 
 busybox: $(TARGET_CRTBEGIN_DYNAMIC_O) $(TARGET_CRTEND_O) $(TARGET_OUT_STATIC_LIBRARIES)/libm.so $(TARGET_OUT_STATIC_LIBRARIES)/libc.so $(TARGET_OUT_STATIC_LIBRARIES)/libdl.so
 	cd external/busybox && \
