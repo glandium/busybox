@@ -131,7 +131,6 @@ BUSYBOX_TOOLS := \
 	pmap \
 	popmaildir \
 	poweroff \
-	powertop \
 	printf \
 	pscan \
 	pstree \
