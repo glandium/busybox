@@ -12,7 +12,6 @@ BUSYBOX_TOOLS := \
 	blockdev \
 	bunzip2 \
 	bzcat \
-	bzip2 \
 	cal \
 	catv \
 	chat \
@@ -71,7 +70,6 @@ BUSYBOX_TOOLS := \
 	getopt \
 	grep \
 	gunzip \
-	gzip \
 	halt \
 	hdparm \
 	head \
@@ -79,11 +77,9 @@ BUSYBOX_TOOLS := \
 	httpd \
 	ifdown \
 	ifup \
-	init \
 	inotifyd \
 	install \
 	iostat \
-	ip \
 	ipaddr \
 	ipcalc \
 	iplink \
@@ -126,7 +122,6 @@ BUSYBOX_TOOLS := \
 	openvt \
 	patch \
 	pidof \
-	ping \
 	pipe_progress \
 	pmap \
 	popmaildir \
