@@ -1,3 +1,5 @@
+BB_PATH := $(call my-dir)
+
 include $(CLEAR_VARS)
 
 BUSYBOX_TOOLS := \
@@ -214,31 +216,45 @@ BUSYBOX_TOOLS := \
 	yes \
 	zcat
 
-BB_TC_DIR := $(realpath $(shell dirname $(TARGET_TOOLS_PREFIX)))
-BB_TC_PREFIX := $(shell basename $(TARGET_TOOLS_PREFIX))
-BB_LDFLAGS := -Xlinker -z -Xlinker muldefs -nostdlib -Bdynamic -Xlinker -T../../$(BUILD_SYSTEM)/armelf.x -Xlinker -dynamic-linker -Xlinker /system/bin/linker -Xlinker -z -Xlinker nocopyreloc -Xlinker --no-undefined ../../$(TARGET_CRTBEGIN_DYNAMIC_O) ../../$(TARGET_CRTEND_O) -L../../$(TARGET_OUT_STATIC_LIBRARIES)
+BB_LDFLAGS := -Xlinker -z -Xlinker muldefs -nostdlib -Bdynamic -Xlinker -T$(CURDIR)/$(BUILD_SYSTEM)/armelf.x -Xlinker -dynamic-linker -Xlinker /system/bin/linker -Xlinker -z -Xlinker nocopyreloc -Xlinker --no-undefined $(CURDIR)/$(TARGET_CRTBEGIN_DYNAMIC_O) $(CURDIR)/$(TARGET_CRTEND_O) -L$(CURDIR)/$(TARGET_OUT_STATIC_LIBRARIES)
 # FIXME remove -fno-strict-aliasing once all aliasing violations are fixed
-BB_COMPILER_FLAGS := $(subst -I ,-I../../,$(subst -include ,-include ../../,$(TARGET_GLOBAL_CFLAGS))) -I../../bionic/libc/include -I../../bionic/libc/kernel/common -I../../bionic/libc/arch-arm/include -I../../bionic/libc/kernel/arch-arm -I../../bionic/libm/include -fno-stack-protector -Wno-error=format-security -fno-strict-aliasing
+BB_COMPILER_FLAGS := $(subst -I ,-I$(CURDIR)/,$(subst -include ,-include $(CURDIR)/,$(TARGET_GLOBAL_CFLAGS))) $(foreach d,$(TARGET_C_INCLUDES),-I$(CURDIR)/$(d)) -fno-stack-protector -Wno-error=format-security -fno-strict-aliasing
 BB_LDLIBS := dl m c gcc
 ifneq ($(strip $(SHOW_COMMANDS)),)
 BB_VERBOSE="V=1"
 endif
 
-.PHONY: busybox
+LOCAL_MODULE := busybox
+LOCAL_MODULE_CLASS := EXECUTABLES
+LOCAL_MODULE_TAGS := optional
 
-droid: busybox
+include $(BUILD_PREBUILT)
 
-systemtarball: symlinks
+BB_OUT_INTERMEDIATES := $(dir $(LOCAL_BUILT_MODULE))
 
-busybox: $(TARGET_CRTBEGIN_DYNAMIC_O) $(TARGET_CRTEND_O) $(TARGET_OUT_STATIC_LIBRARIES)/libm.so $(TARGET_OUT_STATIC_LIBRARIES)/libc.so $(TARGET_OUT_STATIC_LIBRARIES)/libdl.so
-	cd external/busybox && \
-	sed -e "s|^CONFIG_CROSS_COMPILER_PREFIX=.*|CONFIG_CROSS_COMPILER_PREFIX=\"$(BB_TC_PREFIX)\"|;s|^CONFIG_EXTRA_CFLAGS=.*|CONFIG_EXTRA_CFLAGS=\"$(BB_COMPILER_FLAGS)\"|" configs/android_defconfig >.config && \
-	export PATH=$(BB_TC_DIR):$(PATH) && \
-	$(MAKE) oldconfig && \
-	$(MAKE) $(BB_VERBOSE) EXTRA_LDFLAGS="$(BB_LDFLAGS)" LDLIBS="$(BB_LDLIBS)" && \
-	mkdir -p ../../$(PRODUCT_OUT)/system/bin && \
-	cp busybox ../../$(PRODUCT_OUT)/system/bin/
+BB_MAKE_FLAGS := O=$(CURDIR)/$(BB_OUT_INTERMEDIATES) CROSS_COMPILE=$(notdir $(TARGET_TOOLS_PREFIX)) CONFIG_EXTRA_CFLAGS="$(BB_COMPILER_FLAGS)" EXTRA_LDFLAGS="$(BB_LDFLAGS)" LDLIBS="$(BB_LDLIBS)" $(BB_VERBOSE)
 
-symlinks: busybox
-	for link in $(BUSYBOX_TOOLS); do\
-		ln -sf busybox $(PRODUCT_OUT)/system/bin/$$link; done
+$(BB_OUT_INTERMEDIATES):
+	mkdir -p $@
+
+$(BB_OUT_INTERMEDIATES)/.config: $(BB_PATH)/configs/android_defconfig | $(BB_OUT_INTERMEDIATES)
+	$(MAKE) -C $(BB_PATH) android_defconfig $(BB_MAKE_FLAGS)
+
+$(LOCAL_BUILT_MODULE): $(TARGET_CRTBEGIN_DYNAMIC_O) $(TARGET_CRTEND_O) $(TARGET_OUT_SHARED_LIBRARIES)/libm.so $(TARGET_OUT_SHARED_LIBRARIES)/libc.so $(TARGET_OUT_SHARED_LIBRARIES)/libdl.so $(BB_OUT_INTERMEDIATES)/.config FORCE
+	$(MAKE) -C $(BB_PATH) $(BB_MAKE_FLAGS)
+
+# Symbolic link creation, stolen from toolbox
+SYMLINKS := $(addprefix $(TARGET_OUT)/bin/,$(BUSYBOX_TOOLS))
+$(SYMLINKS): BUSYBOX_BINARY := $(LOCAL_MODULE)
+$(SYMLINKS): $(LOCAL_INSTALLED_MODULE) $(BB_PATH)/Android.mk
+	@echo "Symlink: $@ -> $(BUSYBOX_BINARY)"
+	@mkdir -p $(dir $@)
+	@rm -rf $@
+	$(hide) ln -sf $(BUSYBOX_BINARY) $@
+
+ALL_DEFAULT_INSTALLED_MODULES += $(SYMLINKS)
+
+# We need this so that the installed files could be picked up based on the
+# local module name
+ALL_MODULES.$(LOCAL_MODULE).INSTALLED := \
+    $(ALL_MODULES.$(LOCAL_MODULE).INSTALLED) $(SYMLINKS)
