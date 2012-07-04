@@ -5,7 +5,6 @@ include $(CLEAR_VARS)
 BUSYBOX_TOOLS := \
 	ar \
 	arp \
-	ash \
 	awk \
 	base64 \
 	basename \
